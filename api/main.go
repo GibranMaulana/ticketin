@@ -19,6 +19,9 @@ func main() {
 	// 1. Connect to Database
 	db, err := services.DatabaseConnect()
 	if err != nil {
+		if *runMigrations {
+			log.Fatalf("Fatal: DB connection failed during migration: %v", err)
+		}
 		log.Printf("Warning: DB connection failed: %v", err)
 	} else {
 		defer db.Close()

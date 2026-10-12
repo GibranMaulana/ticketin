@@ -63,16 +63,26 @@ func VerifyAccessToken(tokenString string) (*CustomClaims, error) {
 	return nil, errors.New("Invalid access token")
 }
 
-func SetAuthCookie(w http.ResponseWriter, accessToken string, refreshToken string) {
+func getCookieConfig() (bool, http.SameSite) {
 	isProduction := os.Getenv("APP_ENV") == "production"
+	if isProduction {
+		// When frontend (e.g. Vercel) and backend (e.g. Cloud Run) are on different domains,
+		// modern browsers require SameSite=None and Secure=true for cross-site credentials.
+		return true, http.SameSiteNoneMode
+	}
+	return false, http.SameSiteLaxMode
+}
+
+func SetAuthCookie(w http.ResponseWriter, accessToken string, refreshToken string) {
+	secure, sameSite := getCookieConfig()
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProduction,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		MaxAge:   15 * 60,
 	})
 
@@ -81,22 +91,22 @@ func SetAuthCookie(w http.ResponseWriter, accessToken string, refreshToken strin
 		Value:    refreshToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProduction,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		MaxAge:   7 * 24 * 60 * 60,
 	})
 }
 
 func ClearAuthCookie(w http.ResponseWriter) {
-	isProduction := os.Getenv("APP_ENV") == "production"
+	secure, sameSite := getCookieConfig()
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProduction,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		MaxAge:   -1,
 	})
 
@@ -105,8 +115,9 @@ func ClearAuthCookie(w http.ResponseWriter) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProduction,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		MaxAge:   -1,
 	})
 }
+
