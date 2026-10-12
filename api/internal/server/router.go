@@ -40,29 +40,40 @@ func NewRouter(db *sqlx.DB, rdb *redis.Client, email *services.EmailService) *ch
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("API is running with live reload!"))
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Not Found"}` + "\n"))
 	})
 
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("API is running with live reload!"))
+	}
+	r.Get("/", healthHandler)
 
 	auth := &handlers.AuthHandler{DB: db, RDB: rdb, Email: email}
 	user := &handlers.UserHandler{DB: db}
 
-	r.Route("/v1", func(r chi.Router) {
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", auth.RegisterHandler)
-			r.Post("/verify-otp", auth.VerifyOTP)
-			r.Post("/login", auth.LoginHandler)
-			r.Post("/login/verify-otp", auth.LoginVerifyOTPHandler)
-			r.Post("/refresh", auth.RefreshHandler)
-			r.Post("/logout", auth.LogoutHandler)
-		})
+	routes := func(r chi.Router) {
+		r.Route("/v1", func(r chi.Router) {
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/register", auth.RegisterHandler)
+				r.Post("/verify-otp", auth.VerifyOTP)
+				r.Post("/login", auth.LoginHandler)
+				r.Post("/login/verify-otp", auth.LoginVerifyOTPHandler)
+				r.Post("/refresh", auth.RefreshHandler)
+				r.Post("/logout", auth.LogoutHandler)
+			})
 
-		r.Group(func(r chi.Router) {
-			r.Use(ticketinmw.AuthMiddleware)
-			r.Get("/me", user.GetMe)
+			r.Group(func(r chi.Router) {
+				r.Use(ticketinmw.AuthMiddleware)
+				r.Get("/me", user.GetMe)
+			})
 		})
-	})
+	}
+
+	r.Group(routes)
+	r.Route("/api", routes)
 
 	return r
 }
