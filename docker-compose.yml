@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./api:/app
+      - go-mod-cache:/go/pkg/mod
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+      - mailpit
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    env_file:
+      - .env
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    restart: unless-stopped
+
+volumes:
+  go-mod-cache:
+  pg-data:
